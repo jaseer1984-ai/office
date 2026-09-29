@@ -58,15 +58,53 @@ def section(name):
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    q=(request.json or {}).get('message','').strip().lower(); a=analysis()
-    if not q: return jsonify({'answer':'Type a request for Jaseer.'})
-    if 'negative' in q or 'stock' in q or 'inventory' in q: ans=f"Inventory found {a['negative']} negative-stock item(s)."
-    elif 'bank' in q or 'recon' in q or 'finance' in q: ans=f"Finance found {a['unrecon']} bank reconciliation difference(s)."
-    elif 'duplicate' in q or 'audit' in q: ans=f"Audit found {a['dup_sales']} duplicate sales row(s) and {a['dup_journal']} possible duplicate journal line(s)."
-    elif 'sales' in q or 'performance' in q or 'gp' in q: ans=f"Sales are {money(a['sales'])}; gross profit is {money(a['gp'])}; GP margin is {a['gp_pct']:.1f}%."
-    elif 'all' in q or 'attention' in q or 'check' in q: ans='Jaseer completed the Python review. ' + ('; '.join(a['alerts']) if a['alerts'] else 'No major exceptions found.')
-    else: ans="I’m Jaseer. This web test currently uses Python rules, not an LLM. Ask about sales, GP, inventory, bank reconciliation, duplicates, audit, or what needs attention."
-    return jsonify({'answer':ans})
+    try:
+        payload = request.get_json(silent=True) or {}
+        raw = str(payload.get('message', '')).strip()
+        q = raw.lower()
+        if not q:
+            return jsonify({'ok': True, 'answer': 'Type a request for Jaseer.'})
+
+        a = analysis()
+        branches = a.get('branch', [])
+
+        # Specific questions first so broad words such as "sales" do not hide them.
+        if ('highest' in q or 'best' in q or 'top' in q) and 'sales' in q and branches:
+            r = max(branches, key=lambda x: float(x.get('Sales', 0) or 0))
+            ans = f"{r.get('Branch', 'The top branch')} has the highest sales at {money(r.get('Sales', 0))}, with GP margin {float(r.get('GP %', 0)):.1f}%."
+        elif ('lowest' in q or 'worst' in q) and 'sales' in q and branches:
+            r = min(branches, key=lambda x: float(x.get('Sales', 0) or 0))
+            ans = f"{r.get('Branch', 'The lowest branch')} has the lowest sales at {money(r.get('Sales', 0))}, with GP margin {float(r.get('GP %', 0)):.1f}%."
+        elif 'total sales' in q or ('sales' in q and any(x in q for x in ['total','how much','what is'])):
+            ans = f"Total sales for all loaded branches are {money(a['sales'])}. Gross profit is {money(a['gp'])}, giving a GP margin of {a['gp_pct']:.1f}%."
+        elif 'gp' in q or 'gross profit' in q or 'margin' in q:
+            ans = f"Gross profit is {money(a['gp'])} and the overall GP margin is {a['gp_pct']:.1f}%."
+        elif 'branch' in q and 'sales' in q and branches:
+            parts = [f"{r['Branch']}: {money(r['Sales'])} (GP {float(r.get('GP %',0)):.1f}%)" for r in branches]
+            ans = "Sales by branch — " + '; '.join(parts) + '.'
+        elif 'negative' in q or ('stock' in q and any(x in q for x in ['check','issue','problem'])):
+            ans = f"Inventory check found {a['negative']} negative-stock item(s)."
+        elif 'bank' in q or 'recon' in q or 'finance' in q:
+            ans = f"Finance check found {a['unrecon']} bank reconciliation difference(s)."
+        elif 'duplicate' in q or 'audit' in q:
+            ans = f"Audit found {a['dup_sales']} duplicate sales row(s) and {a['dup_journal']} possible duplicate journal line(s)."
+        elif 'unusual' in q or 'large debit' in q:
+            ans = f"Audit found {a['unusual']} unusual debit transaction(s) of SAR 30,000 or more."
+        elif any(x in q for x in ['all shops','all five','needs attention','need attention','full analysis','check everything','check all']):
+            findings = a['alerts'] if a['alerts'] else ['No major exceptions found']
+            ans = f"I checked {a['branches']} loaded branches. Total sales are {money(a['sales'])} with GP margin {a['gp_pct']:.1f}%. Attention: " + '; '.join(findings) + '.'
+        elif 'sales' in q or 'performance' in q:
+            ans = f"Sales are {money(a['sales'])}; gross profit is {money(a['gp'])}; GP margin is {a['gp_pct']:.1f}%."
+        elif 'inventory' in q or 'stock' in q:
+            ans = f"Inventory analysis is active. I found {a['negative']} negative-stock item(s) in the loaded workbook."
+        elif 'hello' in q or q in {'hi','hey'}:
+            ans = "Hello. I’m Jaseer. Ask me about total sales, branch performance, GP, inventory, bank reconciliation, duplicates, unusual transactions, or what needs attention."
+        else:
+            ans = "I can answer from the loaded supermarket workbook without an LLM. Try: ‘What is total sales?’, ‘Which branch has highest sales?’, ‘Check negative stock’, ‘Check bank reconciliation’, or ‘Check all shops and tell me what needs attention.’"
+        return jsonify({'ok': True, 'answer': ans})
+    except Exception as e:
+        app.logger.exception('Jaseer chat failed')
+        return jsonify({'ok': False, 'answer': 'I could not analyse the workbook right now.', 'error': str(e)}), 500
 
 @app.route('/api/upload', methods=['POST'])
 def upload():
