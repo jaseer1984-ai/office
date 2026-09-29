@@ -17,7 +17,23 @@
 <script>
 const drawer=document.getElementById('drawer'),dt=document.getElementById('dt'),dc=document.getElementById('dc');
 async function openSec(n){let r=await fetch('/api/section/'+n),d=await r.json();dt.textContent=d.title;dc.innerHTML=d.lines.map(x=>`<div class="line">${x}</div>`).join('');drawer.classList.add('open')}
-async function ask(){let i=document.getElementById('msg'),q=i.value.trim();if(!q)return;dt.textContent='Chat with Jaseer';dc.innerHTML+=`<div class="bubble"><b>You</b><br>${esc(q)}</div>`;drawer.classList.add('open');i.value='';let r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})}),d=await r.json();dc.innerHTML+=`<div class="bubble j"><b>Jaseer</b><br>${esc(d.answer)}</div>`;drawer.scrollTop=drawer.scrollHeight}
+async function ask(){
+  const i=document.getElementById('msg'), q=i.value.trim(); if(!q)return;
+  dt.textContent='Chat with Jaseer';
+  dc.innerHTML+=`<div class="bubble"><b>You</b><br>${esc(q)}</div>`;
+  drawer.classList.add('open'); i.value='';
+  const waitId='wait-'+Date.now();
+  dc.innerHTML+=`<div id="${waitId}" class="bubble j"><b>Jaseer</b><br>Analysing the loaded data…</div>`;
+  drawer.scrollTop=drawer.scrollHeight;
+  try{
+    const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});
+    const d=await r.json();
+    document.getElementById(waitId).innerHTML=`<b>Jaseer</b><br>${esc(d.answer||d.error||'No answer returned.')}`;
+  }catch(err){
+    document.getElementById(waitId).innerHTML=`<b>Jaseer</b><br>Chat connection error. Please refresh and try again.`;
+  }
+  drawer.scrollTop=drawer.scrollHeight;
+}
 function esc(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 document.getElementById('file').onchange=async e=>{let fd=new FormData();fd.append('file',e.target.files[0]);let r=await fetch('/api/upload',{method:'POST',body:fd}),d=await r.json();dt.textContent=d.ok?'Data Loaded':'Upload Error';dc.innerHTML=`<div class="line">${esc(d.message||d.error)}</div>`;drawer.classList.add('open')}
 async function resetData(){await fetch('/api/reset',{method:'POST'});dt.textContent='Test Data Restored';dc.innerHTML='<div class="line">Bundled September 2026 test workbook is active.</div>';drawer.classList.add('open')}
