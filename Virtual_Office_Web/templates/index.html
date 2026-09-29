@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Virtual Office • Jaseer</title>
+<style>
+*{box-sizing:border-box} body{margin:0;background:#030810;color:#eaf6ff;font-family:Inter,Segoe UI,Arial,sans-serif;overflow-x:hidden}.wrap{max-width:1600px;margin:auto;position:relative}.hero{width:100%;display:block}.hot{position:absolute;border:1px solid transparent;background:transparent;cursor:pointer;border-radius:16px}.hot:hover{border-color:#25d7ff99;background:#25d7ff0b;box-shadow:0 0 22px #00bfff44}.topbar{position:fixed;z-index:20;right:18px;top:16px;display:flex;gap:8px}.pill{background:#07111eea;border:1px solid #183c55;color:#dff7ff;padding:9px 13px;border-radius:12px;cursor:pointer;backdrop-filter:blur(12px)}.pill:hover{border-color:#1ccfff}.drawer{position:fixed;z-index:30;right:-440px;top:0;width:min(440px,94vw);height:100vh;background:#06101af5;border-left:1px solid #173c55;box-shadow:-20px 0 60px #000a;padding:24px;transition:.25s;overflow:auto}.drawer.open{right:0}.close{float:right;font-size:26px;cursor:pointer}.drawer h2{margin-top:35px;color:#73e5ff}.line{padding:12px;margin:8px 0;background:#0b1824;border:1px solid #16384e;border-radius:12px}.chat{position:fixed;z-index:25;left:50%;transform:translateX(-50%);bottom:14px;width:min(760px,92vw);display:flex;gap:8px;padding:8px;background:#06101be8;border:1px solid #173c55;border-radius:16px;backdrop-filter:blur(14px)}.chat input{flex:1;background:#0b1722;border:1px solid #23435a;color:white;border-radius:10px;padding:12px}.chat button{background:#117c9e;color:white;border:0;border-radius:10px;padding:0 18px;cursor:pointer}.bubble{margin:10px 0;padding:12px;border-radius:12px;background:#0c1a26;line-height:1.45}.j{border-left:3px solid #28d7ff}.upload{display:none}.hint{font-size:12px;color:#86a8ba;margin-top:8px}
+</style></head><body>
+<div class="topbar"><label class="pill">Upload Excel<input id="file" class="upload" type="file" accept=".xlsx,.xlsm"></label><button class="pill" onclick="resetData()">Reset Test Data</button></div>
+<div class="wrap"><img class="hero" src="/static/virtual_office.png" alt="Virtual Office approved home UI">
+<button class="hot" style="left:17%;top:11%;width:55%;height:21%" onclick="openSec('accounting')" title="Jaseer / Office"></button>
+<button class="hot" style="left:16%;top:35%;width:22%;height:26%" onclick="openSec('accounting')" title="Accounting"></button>
+<button class="hot" style="left:39%;top:35%;width:21%;height:26%" onclick="openSec('sales')" title="Sales"></button>
+<button class="hot" style="left:61%;top:35%;width:22%;height:26%" onclick="openSec('inventory')" title="Inventory"></button>
+<button class="hot" style="left:16%;top:61%;width:22%;height:22%" onclick="openSec('finance')" title="Finance"></button>
+<button class="hot" style="left:39%;top:61%;width:21%;height:22%" onclick="openSec('audit')" title="Audit"></button>
+<button class="hot" style="left:61%;top:61%;width:22%;height:22%" onclick="openSec('reporting')" title="Reporting"></button>
+</div>
+<div id="drawer" class="drawer"><span class="close" onclick="drawer.classList.remove('open')">×</span><h2 id="dt">Jaseer</h2><div id="dc"></div></div>
+<div class="chat"><input id="msg" placeholder="Ask Jaseer: Check all five shops and tell me what needs attention..." onkeydown="if(event.key==='Enter')ask()"><button onclick="ask()">Send</button></div>
+<script>
+const drawer=document.getElementById('drawer'),dt=document.getElementById('dt'),dc=document.getElementById('dc');
+async function openSec(n){let r=await fetch('/api/section/'+n),d=await r.json();dt.textContent=d.title;dc.innerHTML=d.lines.map(x=>`<div class="line">${x}</div>`).join('');drawer.classList.add('open')}
+async function ask(){let i=document.getElementById('msg'),q=i.value.trim();if(!q)return;dt.textContent='Chat with Jaseer';dc.innerHTML+=`<div class="bubble"><b>You</b><br>${esc(q)}</div>`;drawer.classList.add('open');i.value='';let r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})}),d=await r.json();dc.innerHTML+=`<div class="bubble j"><b>Jaseer</b><br>${esc(d.answer)}</div>`;drawer.scrollTop=drawer.scrollHeight}
+function esc(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+document.getElementById('file').onchange=async e=>{let fd=new FormData();fd.append('file',e.target.files[0]);let r=await fetch('/api/upload',{method:'POST',body:fd}),d=await r.json();dt.textContent=d.ok?'Data Loaded':'Upload Error';dc.innerHTML=`<div class="line">${esc(d.message||d.error)}</div>`;drawer.classList.add('open')}
+async function resetData(){await fetch('/api/reset',{method:'POST'});dt.textContent='Test Data Restored';dc.innerHTML='<div class="line">Bundled September 2026 test workbook is active.</div>';drawer.classList.add('open')}
+</script></body></html>
